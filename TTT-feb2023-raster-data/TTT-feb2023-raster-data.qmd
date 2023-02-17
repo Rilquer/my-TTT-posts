@@ -1,0 +1,115 @@
+---
+title: "Using raster spatial data in R"
+author: "Rilquer Mascarenhas"
+format: html
+editor: visual
+---
+
+A lot of talk is given to spatial data in the *vector* format (i.e., points, lines and polygons) when making maps. After all, they usually consist in the actual baseline for your map visualization; they are the info you use to guide your audience to where they are and what are the limits and location of entities you want to visualize. However, unless your questions are easily answered with overlap and calculations over points and polygons, you might want to start interacting with spatial data in the *raster* format.
+
+A raster file is used to store spatial data about a specific section of the surface of the earth (Fig. 1). Raster files consist in a rectangle-shaped image composed of several little squares of equal sizes. You can think of actual image files (like a photo) and the pixels that compose it: in a photo, each pixel has a specific value for a color; when put together with all other pixels, all colors come together to form the image. The structure of a raster file is essentially the same, but in a raster file, each pixel (or, more formally, each *cell*) is associated with an area in space. Additionally, each cell stores a specific value for the same variable; for instance, you can a raster file for elevation in meter above sea level for New York City (Fig. 2). This raster file will consist of the whole area of NYC divided in several cells of equal size, each one with a number representing elevation in meters. Note that you can also store categorical values in a raster file (e.g., each cell could have a letter representing the borough it belongs to).
+
+*Figures 1 and 2*
+
+Now that we know the structure of a raster files, we realize there are two things we need to think about when using this kind of spatial data: the *extent* and the *resolution* of our raster data.
+
+The extent of a raster represents the geographic limits of that file. In other words, what specific surface of the plane is that raster representing. The extent is always described with four values: the minimum and maximum longitude (also known as **xmin** and **xmax**) and the minimum and maximum latitude (also known as **ymin** and **ymax**). For instance, the raster file above for elevation in NYC has the following extent:
+
+-   xmin: -74 (or 74 degrees west of the Greenwich meridian)
+
+-   xmax:
+
+-   ymin:
+
+-   ymax:
+
+The resolution of a raster stands for how big each square cell is. In other words, how much of the world surface is that cell covering? That information can be given in either 1) the lenght of the side of the square; or 2) the actual area covered by the square. The unit can be in km or miles (or km^2^ or mi^2^), or, more usually, in [actual degrees](http://wiki.gis.com/wiki/index.php/Geographic_coordinate_system) (i.e., unit we use to measure distances and pinpoint locations on a spherical surface). The resolution tells us how much variation we have for our variable of interest in that specific area of the globe (Fig. 3). If we have big cells, it means that a large area is being collapsed into one single value; therefore, we have less information (i.e., lower resolution). Alternatively, if we have four smaller cells that cover the same area that one big cell would be covering, now we have four different values for that area, and they can be slightly different from each other; that means we have more information (i.e., higher resolution). As a practical example, imagine elevation change in NYC. Assume that one random spot is 20m and 1km away from that spot the elevation is 40m. If we have a big cell covering both spots, we would need to calculate the average of both spots and assign this big cell the value of 30m (which is not bad, it's a good compromised approximation of reality). However, if we have smaller cells (higher resolution), in a way that each spot has its own cell, then we can assign different values and actually have a more realistic representation of the change in elevation from one spot to the other.
+
+*Figure 3*
+
+The importance of knowing and deciding on your extent and resolution is that 1) it defines the amount of information you will have to answer the question you want or visualize/convey the information you want; 2) it will impact the size of the file and easy it will be to deal with it in a GIS application. Keep that in mind when looking around for raster files.
+
+#### Quick intro to using Raster files in R
+
+Let's take a quick look on how to work with raster files within the R language. Keep in mind that most of the steps we will see here can be used in any other GIS platform (QGIS, ArcGIS, python language, etc.). R is just one option among many to visualize and analyze spatial data.
+
+In R, we use the `raster` package to work with raster files. This package contains several useful function to load, visualize and modify raster files. So let's install it (if we haven't it yet).
+
+```{r}
+install.packages('raster')
+```
+
+Now we need to load the package...
+
+```{r}
+library(raster)
+```
+
+... and use the function `raster` to load a raster file saved to our computer into our R session. Here, we are loading the raster of elevation across the world, from the [WorldClim](https://www.worldclim.org/data/worldclim21.html) database. There are four resolutions for the elevation data (representing the length of the side of each cell): 10 arc-min, 5 arc-min, 2.5 arc-min and 30 arc-seconds. We will download the 10 arc-min resolution (highest number, so larger cells and lower resolution), so we can work with a smaller file and make our life easier. One arc-min equals approximately 1.8 km at the equator. Therefore, a 10 arc-min resolution means our cell has a side length of 1.8 km \* 10 = 18km. This means all elevation values within an 18km distance are collapsed into one single value. Considering this file covers the whole globe, that is actually not a bad resolution. Also, note that one arc-min represents different lengths depending on the latitude you are. [Here](https://www.opendem.info/arc2meters.html) is a useful Arc2Meters converter that takes latitude into account.
+
+```{r}
+# Notice the file extension is .tif, which is the extension for image files.
+
+globe_elevation <- raster('wc2.1_10m_elev.tif')
+```
+
+The `raster` function loads our raster file into R as a `raster` object. We can see some information about that object if we just call it:
+
+```{r}
+globe_elevation
+```
+
+The information printed to the console show us:
+
+-   the class of the object (a RasterLayer);
+
+-   the dimensions (i.e., the number of rows, number of columns and number of cells composing this image);
+
+-   the resolution, which is shown in decimal degrees. In this case, 0.1666667, which means one side is approximately 0.166667 (or 16.66667%) of a degree (which is made up of 60 arc-minutes). If we calculate 16.66667% of 60 arc-min, we arrive at approximately 10 arc-min (the original resolution).
+
+-   the extent, also given in decimal degrees. Here, we see that xmin = -180 (180 degrees west of the Greenwhich meridian), xmax = 180 (180 degrees east of the meridian), ymin = -90 (90 degrees below the equator) and ymax = 90 (90 degrees above the equator).
+
+Other information include the projection (*crs*), the source, name of the layer and values in it (which we will cover in a separate blog post).
+
+We can visualize that object in a map using the `plot` function.
+
+```{r}
+plot(globe_elevation)
+```
+
+R uses a default color scheme to show the gradient of elevation across this dataset. Notice how the areas in green are the highest mountain range sin the globe (the Andes and the Himalayas).
+
+Let's say we want to focus on North America, since we want to explore more the elevation gradient in that region and how it correlates, say, to population density. We can use the function `crop` to modify the extent of our file. That function requires 1) the raster object to be cropped; 2) the extent to which it should be cropped. We give the extent as a vector in the order **xmin, xmax, ymin, ymax**. The numbers shown below were retrieved from a visual inspection of the coordinates (like in google maps, for instance).
+
+```{r}
+north_america_elevation <- crop(globe_elevation,c(-141,-51,17,59))
+```
+
+Now let's visualize our new raster:
+
+```{r}
+plot(north_america_elevation)
+```
+
+As a final exercise, let's try to plot a vector file on top of our raster file. For this, we will use a vector file with the states of a few countries in the world (US and Canada included), retrieved from the databse [Natural Earth](https://www.naturalearthdata.com/downloads/50m-cultural-vectors/). In the page linked, we have vectors of political boundaries across the world, one of them being **Admin 1 - States, provinces**, which is the one that we download.
+
+Vector files come as a collection of files, one of them being a shapefile with extension *.shp*. Here, we will use the `rgdal` package to load our shapefile into R (make sure to install this package if you don't have it yet).
+
+```{r}
+library(rgdal)
+states <- readOGR('ne_50m_admin_1_states_provinces/ne_50m_admin_1_states_provinces.shp')
+```
+
+To plot states on top of our raster, we first plot our raster object...
+
+```{r}
+plot(north_america_elevation)
+```
+
+... and then we plot our shapefile object, using the argument `add=T`, which tells R to add our second plot on top of our first one.
+
+```{r}
+plot(states,add=T)
+```
+
+And there you go: now we have a map combining information from both vector and raster files. One following step could be to extract elevation information per state and, as your probably guessed, functions for such tasks are built within the `raster` package. That is something we will be covering in future posts about the `raster` package.
